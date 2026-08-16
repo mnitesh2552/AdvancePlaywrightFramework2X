@@ -9,3 +9,12 @@ node_modules/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Custom TTA report output
+/tta-report/
+
+# Flaky analyzer build snapshots
+/reports/
+
+# Logs
+/logs/

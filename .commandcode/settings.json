@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "Shell(mkdir:*)",
-      "Shell(npm:*)"
+      "Shell(npm:*)",
+      "Shell(npx playwright --version)",
+      "Shell(npx playwright test src/tests/login.spec.ts --reporter=line)",
+      "Shell(npx playwright test src/tests/login.spec.ts)",
+      "Shell(node -e \"require('dotenv').config(); console.log('BASE_URL=', process.env.BASE_URL); console.log('QA_BASE_URL=', process.env.QA_BASE_URL); console.log('TTA_ENV=', process.env.TTA_ENV);\")",
+      "Shell(type:*)",
+      "Shell(cmd:*)",
+      "Shell(node -e \"process.env.BASE_URL=''; process.env.QA_BASE_URL=''; require('dotenv').config(); function resolveBaseURL(){ if (process.env.BASE_URL) return process.env.BASE_URL; const env=(process.env.TTA_ENV||'qa').toLowerCase(); switch(env){ case 'api': return process.env.API_BASE_URL||'https://restful-booker.herokuapp.com'; case 'dev': case 'local': return process.env.DEV_BASE_URL||'http://localhost:3000'; case 'stg': case 'stage': case 'staging': return process.env.STG_BASE_URL||'https://stage.thetestingacademy.com'; case 'prod': case 'production': return process.env.PROD_BASE_URL||'https://app.thetestingacademy.com'; case 'qa': default: return process.env.QA_BASE_URL||'https://app.thetestingacademy.com'; } } console.log('resolved baseURL =', resolveBaseURL());\")",
+      "Shell(node -e \"const { chromium } = require('@playwright/test'); (async () => { const browser = await chromium.launch(); const ctx = await browser.newContext({ baseURL: 'https://app.thetestingacademy.com' }); const page = await ctx.newPage(); try { await page.goto('/playwright/ttacart/index.html'); console.log('OK', page.url()); } catch (e) { console.log('ERR', e.message.split('\\n')[0]); } await browser.close(); })();\")",
+      "Shell(git:*)"
     ],
     "deny": [],
     "defaultMode": "default"

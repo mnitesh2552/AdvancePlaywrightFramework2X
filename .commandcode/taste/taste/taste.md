@@ -1,0 +1,12 @@
+# Taste
+- Prefers test automation framework tooling installed as devDependencies via `npm install -D` (e.g., dotenv, csv-parse, xlsx, winston, faker, jsonpath, ajv, allure). Confidence: 0.8
+- Prefers Playwright test runs to always record video and traces, and capture screenshots on failures (video: 'on', trace: 'on', screenshot: 'only-on-failure'). Confidence: 0.9
+- Prefers a custom HTML reporter registered in the Playwright config and opening the generated HTML report in the browser after a run. Confidence: 0.8
+- Prefers comprehensive, self-contained README/docs that let anyone use the project without prior knowledge — covering framework details, setup, configuration, usage, and troubleshooting. Confidence: 0.8
+- Prefers documentation that is visually attractive and easy to scan — emojis, badges, tables, diagrams (e.g., Mermaid), and annotated code blocks. Confidence: 0.8
+- Prefers to confirm feasibility and get explicit approval before applying changes (e.g., "first let me know, once approved then only start"). Confidence: 0.9
+- Prefers minimal-scope changes — only modify exactly what was requested and touch nothing else unless asked. Confidence: 0.9
+- When rebranding text (headings, branding), prefers updating all occurrences for consistency — main heading, subheading, browser tab title, and history page — rather than only the most visible spots. Confidence: 0.7
+- After changing code that affects generated output (e.g., report branding), expects the change to be verified end-to-end — re-run the relevant test, confirm the new text appears in the regenerated artifact, and view it in the browser. Confidence: 0.9
+- Prefers identity/branding metadata (e.g., test author name shown in the report) to be fixed at its central source (e.g., `.env` env var read by the reporter) so the corrected value applies to all upcoming test runs, not just one test. Confidence: 0.8
+- When asked for completion status, wants a direct, affirmative answer ("Yes") backed by actual verification that the work is done and all files are saved on disk (e.g., git status/grep), not just an assumption. Confidence: 0.7

@@ -3,27 +3,44 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+/** Strip accidental markdown-link formatting, e.g. `[https://x.com](https://x.com/)`. */
+function sanitizeURL(value: string): string {
+  const match = value.match(/\[(https?:\/\/[^\]]+)\]/);
+  return (match ? match[1] : value).trim().replace(/\/+$/, '');
+}
+
 function resolveBaseURL(): string {
-  if (process.env.BASE_URL) return process.env.BASE_URL;
+  const candidates = [
+    process.env.BASE_URL,
+    process.env.QA_BASE_URL,
+    process.env.STG_BASE_URL,
+    process.env.PROD_BASE_URL,
+    process.env.DEV_BASE_URL,
+    process.env.API_BASE_URL,
+  ];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const cleaned = sanitizeURL(candidate);
+    if (/^https?:\/\/.+/i.test(cleaned)) return cleaned;
+  }
   const env = (process.env.TTA_ENV || 'qa').toLowerCase();
   switch (env) {
     case 'api':
-      return process.env.API_BASE_URL || 'https://restful-booker.herokuapp.com';
+      return 'https://restful-booker.herokuapp.com';
     case 'dev':
     case 'local':
-      return process.env.DEV_BASE_URL || 'http://localhost:3000';
+      return 'http://localhost:3000';
     case 'stg':
     case 'stage':
     case 'staging':
-      return process.env.STG_BASE_URL || 'https://stage.thetestingacademy.com';
+      return 'https://stage.thetestingacademy.com';
     case 'prod':
     case 'production':
-      return process.env.PROD_BASE_URL || 'https://app.thetestingacademy.com';
+      return 'https://app.thetestingacademy.com';
     case 'qa':
     default:
-      return process.env.QA_BASE_URL || 'https://app.thetestingacademy.com';
+      return 'https://app.thetestingacademy.com';
   }
-
 }
 
 
