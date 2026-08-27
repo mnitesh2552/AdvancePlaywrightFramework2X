@@ -17,6 +17,7 @@ import {
 } from '@playwright/test/reporter';
 import * as fs from 'fs';
 import * as path from 'path';
+import { execSync } from 'child_process';
 import { analyzeFailure, type RcaVerdict } from '../ai/agents/rcaAgent';
 import { analyzeFlaky, type BuildSummary, type FlakyResult } from '../ai/agents/flakyAnalyzer';
 import { hasApiKey } from '../ai/config/providers';
@@ -458,6 +459,38 @@ class CustomTTAReporter implements Reporter {
         console.log('\n📊 Generating TTA HTML Report...');
         await this.generateReport();
         console.log(`✅ Report generated: ${this.outputFile}`);
+
+        this.openReportInChrome();
+    }
+
+    /**
+     * Open the generated report in the default browser (Chrome on Windows).
+     * Disable by setting OPEN_REPORT=false. Uses the local file URL so
+     * screenshots/videos/traces relative to the report load correctly.
+     */
+    private openReportInChrome(): void {
+        if (process.env.OPEN_REPORT?.toLowerCase() === 'false') return;
+
+        const reportPath = path.resolve(this.outputFile);
+        const fileUrl = `file:///${reportPath.replace(/\\/g, '/')}`;
+
+        let cmd: string;
+        if (process.platform === 'win32') {
+            cmd = `start "" "${fileUrl}"`;
+        } else if (process.platform === 'darwin') {
+            cmd = `open "${fileUrl}"`;
+        } else {
+            cmd = `xdg-open "${fileUrl}"`;
+        }
+
+        try {
+            // Synchronous: the browser process must be launched before Playwright
+            // exits, otherwise the async child is killed with the parent.
+            execSync(cmd, { stdio: 'ignore', detached: false });
+            console.log(`🌐 Report opened in browser: ${fileUrl}`);
+        } catch (error) {
+            console.warn(`⚠️  Could not open report in browser: ${(error as Error).message}`);
+        }
     }
 
     /**

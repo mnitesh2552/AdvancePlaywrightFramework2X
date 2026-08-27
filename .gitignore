@@ -1,6 +1,6 @@
 
 # Environment
-.env
+# .env removed from ignore so it ships with the repo for other machines
 
 # Playwright
 node_modules/
