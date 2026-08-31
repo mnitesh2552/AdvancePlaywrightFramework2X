@@ -24,6 +24,7 @@
 - [⚙️ Configuration](#️-configuration)
 - [🏗️ Framework Architecture](#️-framework-architecture)
 - [📝 Writing Tests](#-writing-tests)
+- [AI-Assisted Playwright Workflows](#ai-assisted-playwright-workflows)
 - [🧩 Page Objects](#-page-objects)
 - [🛠️ Utilities](#️-utilities)
 - [📊 Reports & Artifacts](#-reports--artifacts)
@@ -76,10 +77,16 @@
 ```text
 advanceplaywrightframework2x/
 ├── .env                          # Environment variables (SHIPPED with the repo)
+├── .claude/
+│   ├── commands/
+│   │   └── gogo.md                # README, verification, commit, and push workflow
+│   └── skills/                    # Task-specific Playwright agent playbooks
 ├── .github/
-│   └── workflows/
-│       └── playwright.yml        # CI: install, run tests, upload report
+│   ├── workflows/
+│   │   └── playwright.yml        # CI: install, run tests, upload report
+│   └── copilot-instructions.md   # Repository conventions for GitHub Copilot
 ├── docs/                         # Additional documentation (extend me)
+├── learnings/                    # Implementation notes and repeatable lessons
 ├── logs/                         # Winston runtime logs (combined.log)
 ├── playwright-report/            # Playwright's built-in HTML report output
 ├── reports/
@@ -115,7 +122,6 @@ advanceplaywrightframework2x/
 │   │   │   └── login.spec.ts
 │   │   ├── e2e/
 │   │   │   ├── e2e-checkout.spec.ts      # Checkout flow (hardcoded item)
-│   │   │   ├── e2e-checkout-env.spec.ts  # Checkout flow (env-driven data)
 │   │   │   └── e2e-checkout_new_fixture.spec.ts
 │   │   ├── login.spec.ts
 │   │   └── example.spec.ts
@@ -354,6 +360,28 @@ test.describe('TTACart - Login', () => {
 - ✅ **Never touch selectors directly in specs** — always go through Page Objects.
 - ✅ **Tag tests** with `@p0`, `@p1`, `@smoke` — the report supports priority filtering.
 - ✅ **Log key actions** via `createLogger()` — every line is timestamped & scoped.
+
+---
+
+## AI-Assisted Playwright Workflows
+
+**Concept:** The repository keeps task-specific agent playbooks in `.claude/skills/`, GitHub Copilot conventions in `.github/copilot-instructions.md`, and a release workflow in `.claude/commands/gogo.md`. The playbooks cover Page Objects, fixtures, test generation, locators, API tests, network mocking, flake and trace analysis, visual regression, accessibility, CI, and feature explainers.
+
+**Why:** The guidance keeps generated tests aligned with the framework's fixture-first Page Object pattern. It prevents common drift such as importing from `@playwright/test` in specs, placing locators in tests, or bypassing `UtilElementLocator`.
+
+**Q&A - why use this?**
+
+- **Which playbook should I use?** Choose the skill matching the task, for example `pw-test-generator` for a new scenario or `pw-flaky-debugger` for an intermittent failure.
+- **Can the skills be used outside Claude?** Yes. They use the portable `SKILL.md` layout. Codex can load them as installed skills, and Command Code can load the folder with `commandcode --skill .claude/skills`.
+- **What does `gogo` do?** It reviews the changes, updates this README, runs the TypeScript and Playwright checks, then stages, commits, and pushes only the explained files.
+
+```bash
+# Start Command Code with the repository's Playwright skills available
+commandcode --skill .claude/skills
+
+# In a Codex session where the skills are installed
+$pw-test-generator generate a checkout scenario
+```
 
 ---
 
