@@ -75,6 +75,7 @@
 
 ```text
 advanceplaywrightframework2x/
+├── .env                          # Environment variables (SHIPPED with the repo)
 ├── .github/
 │   └── workflows/
 │       └── playwright.yml        # CI: install, run tests, upload report
@@ -92,8 +93,12 @@ advanceplaywrightframework2x/
 │   │   └── config/
 │   │       └── providers.ts      # LLM provider detection (hasApiKey)
 │   ├── api/                      # API layer (extend me)
-│   ├── config/                   # Config helpers (extend me)
-│   ├── fixtures/                 # Playwright fixtures (extend me)
+│   ├── config/                   # Config helpers
+│   │   ├── env.ts                # .env loader (requireEnv / envOr / assertEnv)
+│   │   ├── credentials.ts        # Standard-user credentials from env
+│   │   └── reportConfig.ts       # 🎚️ ATTACH_SCREENSHOTS flag (screenshots/video/trace)
+│   ├── fixtures/
+│   │   └── test-base.ts          # Pre-wired `test` with a fixture per Page Object
 │   ├── pages/                    # 🧩 Page Object Model classes
 │   │   ├── BasePage.ts           # Shared scaffolding for all pages
 │   │   ├── LoginPage.ts
@@ -103,18 +108,25 @@ advanceplaywrightframework2x/
 │   │   ├── CheckoutStepOnePage.ts
 │   │   ├── CheckoutStepTwoPage.ts
 │   │   └── CheckoutCompletePage.ts
-│   ├── testdata/                 # Static / dynamic test data (extend me)
+│   ├── testdata/                 # Static / dynamic test data
+│   │   └── logintestdata.json    # Login users (standard, locked-out, etc.)
 │   ├── tests/                    # 🧪 Playwright specs (testDir)
+│   │   ├── login/
+│   │   │   └── login.spec.ts
+│   │   ├── e2e/
+│   │   │   ├── e2e-checkout.spec.ts      # Checkout flow (hardcoded item)
+│   │   │   ├── e2e-checkout-env.spec.ts  # Checkout flow (env-driven data)
+│   │   │   └── e2e-checkout_new_fixture.spec.ts
 │   │   ├── login.spec.ts
 │   │   └── example.spec.ts
 │   └── utils/                    # 🛠️ Shared utilities
 │       ├── CustomReporter.ts     # 🎭 Custom TTA HTML reporter
 │       ├── DataGenerator.ts      # Faker-backed fake data
 │       ├── UtilElementLocator.ts # Reusable element actions
+│       ├── visualStep.ts         # test.step wrapper + optional step screenshots
 │       └── logger.ts             # Winston logger
 ├── test-results/                 # Failure artifacts (screenshots/videos/traces)
 ├── tta-report/                   # 🎭 Custom reporter output (HTML + assets)
-├── .env                          # Environment variables (gitignored)
 ├── .gitignore
 ├── package.json
 ├── playwright.config.ts          # ⚙️ Main Playwright configuration
@@ -150,7 +162,7 @@ npx playwright install --with-deps
 
 ### 3. Configure Environment
 
-Copy the sample environment values (create `.env` if it doesn't exist):
+The `.env` file **ships with the repository** — everything is pre-configured, so a fresh clone runs out of the box:
 
 ```env
 TTA_ENV=qa
@@ -163,12 +175,16 @@ API_BASE_URL=https://restful-booker.herokuapp.com
 LOG_LEVEL=info
 TEST_ENV=QA
 TEST_AUTHOR=Nitesh Kumar
+USERNAME=admin
+PASSWORD=ADMIN123
+OPEN_REPORT=true
+ATTACH_SCREENSHOTS=false        # set true to capture screenshots/videos/traces
 ```
 
 ### 4. Run Your First Test
 
 ```bash
-npx playwright test src/tests/login.spec.ts
+npx playwright test src/tests/login/login.spec.ts
 ```
 
 You should see:
@@ -192,10 +208,29 @@ You should see:
 | `retries` | `2` (CI) / `0` (local) | Retry flaky tests in CI |
 | `reporter` | `['html', 'list', './src/utils/CustomReporter.ts']` | Playwright HTML + console + custom TTA report |
 | `use.baseURL` | Resolved from env | Root URL for relative `goto()` calls |
-| `use.screenshot` | `'only-on-failure'` | Capture screenshot when a test fails |
-| `use.video` | `'on'` | Record video for **every** test |
-| `use.trace` | `'on'` | Capture trace for **every** test |
+| `use.screenshot` | From `ATTACH_SCREENSHOTS` | `'only-on-failure'` when true, `'off'` when false |
+| `use.video` | From `ATTACH_SCREENSHOTS` | `'on'` when true, `'off'` when false |
+| `use.trace` | From `ATTACH_SCREENSHOTS` | `'on'` when true, `'off'` when false |
 | `projects` | `chromium` (Desktop Chrome) | Add Firefox/WebKit as needed |
+
+### 🎚️ The `ATTACH_SCREENSHOTS` flag
+
+One env var controls whether screenshots, videos and traces are captured and attached to the TTA report:
+
+| Value | Screenshot | Video | Trace |
+|---|---|---|---|
+| `true` | On failure + per `visualStep` | Every test | Every test |
+| `false` *(default)* | Off | Off | Off |
+
+Set it in `.env` or override per run:
+
+```bash
+# Attach everything (steps get screenshots, video + trace recorded)
+ATTACH_SCREENSHOTS=true npx playwright test
+
+# Lean/fast runs — nothing captured (this is the default)
+npx playwright test
+```
 
 ### Adding browsers
 
@@ -447,6 +482,44 @@ const log = createLogger('InventoryPage');
 log.info('Adding item to cart');
 ```
 
+### `visualStep.ts` — steps with optional screenshots
+
+A thin wrapper over `test.step` that also grabs a step screenshot **when `ATTACH_SCREENSHOTS=true`** and attaches it to the TTA report (matched to the step by name):
+
+```ts
+import { visualStep } from '@utils/visualStep';
+
+await visualStep(page, 'Open the cart', async () => {
+    await cartPage.open();
+    expect(await cartPage.rowCount()).toBe(1);
+});
+```
+
+Steps still appear in the report with timings even when screenshots are disabled.
+
+### `fixtures/test-base.ts` — pre-wired Page Object fixtures
+
+Instead of `new LoginPage(page)` in every spec, import `test` from `@fixtures/test-base` and ask for the page you need — each fixture hands you a constructed Page Object bound to the test's `page`:
+
+```ts
+import { test, expect } from '@fixtures/test-base';
+
+test('add to cart', async ({ inventoryPage, cartPage }) => {
+    await inventoryPage.open();
+    await inventoryPage.addToCart('tta-bike-light');
+    await cartPage.open();
+    expect(await cartPage.rowCount()).toBe(1);
+});
+```
+
+Available fixtures: `loginPage`, `inventoryPage`, `itemDetailPage`, `cartPage`, `checkoutStepOnePage`, `checkoutStepTwoPage`, `checkoutCompletePage` — plus stateful fixtures `invalidLogin`, `validLogin`, `loginWithInventory` and `loginWithSelectedItem` for reusable setup.
+
+### `config/` helpers
+
+- `env.ts` — loads `.env` once and exports `requireEnv(key)`, `envOr(key, fallback)` and `assertEnv(...keys)`.
+- `credentials.ts` — the standard user's login, read from `STANDARD_USER` / `TTA_SECRET` env vars.
+- `reportConfig.ts` — reads the `ATTACH_SCREENSHOTS` flag and exposes the capture settings used by `playwright.config.ts`, `visualStep.ts` and `CustomReporter.ts`.
+
 ---
 
 ## 📊 Reports & Artifacts
@@ -463,11 +536,13 @@ The framework produces **three** reporting outputs:
 
 ### Artifacts captured per test
 
-| Artifact | Setting | When |
+Capture is governed by the `ATTACH_SCREENSHOTS` flag (see [Configuration](#️-configuration)):
+
+| Artifact | `ATTACH_SCREENSHOTS=true` | `ATTACH_SCREENSHOTS=false` |
 |---|---|---|
-| 🎥 **Video** | `video: 'on'` | **Every** test |
-| 🧾 **Trace** | `trace: 'on'` | **Every** test |
-| 📷 **Screenshot** | `screenshot: 'only-on-failure'` | On failure only |
+| 🎥 **Video** | Every test | Off |
+| 🧾 **Trace** | Every test | Off |
+| 📷 **Screenshot** | On failure + per `visualStep` | Off |
 
 Artifacts are stored in `test-results/` and (for failures) copied into `tta-report/`:
 
@@ -571,6 +646,13 @@ Other useful env vars:
 | `LOG_LEVEL` | Winston log level (`debug`, `info`, `warn`, `error`) |
 | `TEST_ENV` | Display label in the report |
 | `TEST_AUTHOR` | Author name shown in the report table |
+| `OPEN_REPORT` | Auto-open the TTA report in a browser (`true`/`false`) |
+| `ATTACH_SCREENSHOTS` | Master switch for screenshots/videos/traces (`true`/`false`) |
+| `STANDARD_USER` / `TTA_SECRET` | Login credentials used by the tests (falls back to `standard_user` / `tta_secret`) |
+| `CHECKOUT_ITEM_ID` | Item to add to cart in the env-driven checkout spec |
+| `CHECKOUT_FIRST_NAME` / `CHECKOUT_LAST_NAME` / `CHECKOUT_POSTAL_CODE` | Optional customer overrides for the env-driven checkout spec (else Faker) |
+
+> Shell/CI environment variables take precedence over `.env` values.
 
 ---
 
@@ -624,7 +706,7 @@ npx playwright test
 ### Run a single file
 
 ```bash
-npx playwright test src/tests/login.spec.ts
+npx playwright test src/tests/login/login.spec.ts
 ```
 
 ### Run by test name / tag
@@ -682,8 +764,7 @@ npx playwright show-trace test-results/<test-dir>/trace.zip
 | `Cannot navigate to invalid URL` | Malformed `BASE_URL` in `.env` or stale env vars | Fix `.env` values; the config now sanitizes markdown-link values, so restart your terminal |
 | `page.goto` ignores baseURL | `baseURL` not set in config | Confirm `use.baseURL` resolves in `resolveBaseURL()` |
 | Test fails only in CI | Missing system deps / flakiness | `npx playwright install --with-deps`; retries auto-enabled in CI |
-| No screenshots on failure | `screenshot` set to `'off'` | Set `use.screenshot: 'only-on-failure'` |
-| No video captured | `video` not `'on'` | Set `use.video: 'on'` |
+| No screenshots/videos/traces | `ATTACH_SCREENSHOTS` is `false` | Set `ATTACH_SCREENSHOTS=true` in `.env` or as an env var |
 | AI Verdict tab empty | No LLM API key | Set `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` |
 | Flaky tab says "needs two builds" | Only one snapshot exists | Run the suite once more |
 | `Cannot find module '@pages/...'` | Path alias not resolved | Use Playwright ≥1.62 or install `tsconfig-paths` |

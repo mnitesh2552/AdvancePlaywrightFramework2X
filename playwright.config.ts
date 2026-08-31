@@ -3,6 +3,8 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+import { captureScreenshot, captureTrace, captureVideo } from './src/config/reportConfig';
+
 /** Strip accidental markdown-link formatting, e.g. `[https://x.com](https://x.com/)`. */
 function sanitizeURL(value: string): string {
   const match = value.match(/\[(https?:\/\/[^\]]+)\]/);
@@ -65,9 +67,9 @@ export default defineConfig({
 
   use: {
     baseURL: resolveBaseURL(),
-    screenshot: 'only-on-failure',
-    video: 'on',
-    trace: 'on'
+    screenshot: captureScreenshot,
+    video: captureVideo,
+    trace: captureTrace
   },
 
   projects: [

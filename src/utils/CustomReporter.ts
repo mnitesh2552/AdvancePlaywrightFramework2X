@@ -21,6 +21,7 @@ import { execSync } from 'child_process';
 import { analyzeFailure, type RcaVerdict } from '../ai/agents/rcaAgent';
 import { analyzeFlaky, type BuildSummary, type FlakyResult } from '../ai/agents/flakyAnalyzer';
 import { hasApiKey } from '../ai/config/providers';
+import { ATTACH_SCREENSHOTS } from '../config/reportConfig';
 
 export interface StepData {
     title: string;
@@ -248,72 +249,77 @@ class CustomTTAReporter implements Reporter {
         let videoPath: string | undefined;
         let tracePath: string | undefined;
 
-        for (const attachment of result.attachments) {
-            if (attachment.contentType === 'image/png') {
-                const screenshotName = `screenshot_${this.testCounter}_${screenshots.length + 1}.png`;
-                const destPath = path.join('tta-report', 'screenshots', screenshotName);
-                const destDir = path.dirname(destPath);
-                if (!fs.existsSync(destDir)) {
-                    fs.mkdirSync(destDir, { recursive: true });
+        // When ATTACH_SCREENSHOTS=false, no attachments are produced (visual
+        // steps skip screenshots and the config disables video/trace), so skip
+        // the whole copy step and keep the report clean.
+        if (ATTACH_SCREENSHOTS) {
+            for (const attachment of result.attachments) {
+                if (attachment.contentType === 'image/png') {
+                    const screenshotName = `screenshot_${this.testCounter}_${screenshots.length + 1}.png`;
+                    const destPath = path.join('tta-report', 'screenshots', screenshotName);
+                    const destDir = path.dirname(destPath);
+                    if (!fs.existsSync(destDir)) {
+                        fs.mkdirSync(destDir, { recursive: true });
+                    }
+                    try {
+                        if (attachment.path) {
+                            fs.copyFileSync(attachment.path, destPath);
+                        } else if (attachment.body) {
+                            fs.writeFileSync(destPath, attachment.body);
+                        }
+                        screenshots.push({ name: attachment.name || `Screenshot ${screenshots.length + 1}`, path: `screenshots/${screenshotName}` });
+                        if (attachment.name) {
+                            stepScreenshots.set(attachment.name, `screenshots/${screenshotName}`);
+                        }
+                    } catch {
+                        console.warn(`Failed to save screenshot: ${attachment.name}`);
+                    }
                 }
-                try {
-                    if (attachment.path) {
+
+                if (attachment.contentType === 'video/webm' && attachment.path) {
+                    const videoName = `video_${this.testCounter}.webm`;
+                    const destPath = path.join('tta-report', 'videos', videoName);
+                    const destDir = path.dirname(destPath);
+                    if (!fs.existsSync(destDir)) {
+                        fs.mkdirSync(destDir, { recursive: true });
+                    }
+                    try {
                         fs.copyFileSync(attachment.path, destPath);
-                    } else if (attachment.body) {
-                        fs.writeFileSync(destPath, attachment.body);
+                        videoPath = `videos/${videoName}`;
+                    } catch {
+                        console.warn(`Failed to copy video: ${attachment.path}`);
                     }
-                    screenshots.push({ name: attachment.name || `Screenshot ${screenshots.length + 1}`, path: `screenshots/${screenshotName}` });
-                    if (attachment.name) {
-                        stepScreenshots.set(attachment.name, `screenshots/${screenshotName}`);
+                }
+
+                if (attachment.name === 'trace' && attachment.path) {
+                    const traceName = `trace_${this.testCounter}.zip`;
+                    const destPath = path.join('tta-report', 'traces', traceName);
+                    const destDir = path.dirname(destPath);
+                    if (!fs.existsSync(destDir)) {
+                        fs.mkdirSync(destDir, { recursive: true });
                     }
-                } catch {
-                    console.warn(`Failed to save screenshot: ${attachment.name}`);
-                }
-            }
-
-            if (attachment.contentType === 'video/webm' && attachment.path) {
-                const videoName = `video_${this.testCounter}.webm`;
-                const destPath = path.join('tta-report', 'videos', videoName);
-                const destDir = path.dirname(destPath);
-                if (!fs.existsSync(destDir)) {
-                    fs.mkdirSync(destDir, { recursive: true });
-                }
-                try {
-                    fs.copyFileSync(attachment.path, destPath);
-                    videoPath = `videos/${videoName}`;
-                } catch {
-                    console.warn(`Failed to copy video: ${attachment.path}`);
-                }
-            }
-
-            if (attachment.name === 'trace' && attachment.path) {
-                const traceName = `trace_${this.testCounter}.zip`;
-                const destPath = path.join('tta-report', 'traces', traceName);
-                const destDir = path.dirname(destPath);
-                if (!fs.existsSync(destDir)) {
-                    fs.mkdirSync(destDir, { recursive: true });
-                }
-                try {
-                    fs.copyFileSync(attachment.path, destPath);
-                    tracePath = `traces/${traceName}`;
-                } catch {
-                    console.warn(`Failed to copy trace: ${attachment.path}`);
-                }
-            }
-
-            // AI-generated test data (from generateTestData -> testInfo.attach('ai-data')).
-            if (attachment.name === 'ai-data' && attachment.contentType === 'application/json') {
-                try {
-                    const body = attachment.body
-                        ? attachment.body.toString()
-                        : attachment.path
-                            ? fs.readFileSync(attachment.path, 'utf-8')
-                            : '';
-                    if (body) {
-                        this.aiData.push({ test: test.title, json: body });
+                    try {
+                        fs.copyFileSync(attachment.path, destPath);
+                        tracePath = `traces/${traceName}`;
+                    } catch {
+                        console.warn(`Failed to copy trace: ${attachment.path}`);
                     }
-                } catch {
-                    console.warn('Failed to read ai-data attachment');
+                }
+
+                // AI-generated test data (from generateTestData -> testInfo.attach('ai-data')).
+                if (attachment.name === 'ai-data' && attachment.contentType === 'application/json') {
+                    try {
+                        const body = attachment.body
+                            ? attachment.body.toString()
+                            : attachment.path
+                                ? fs.readFileSync(attachment.path, 'utf-8')
+                                : '';
+                        if (body) {
+                            this.aiData.push({ test: test.title, json: body });
+                        }
+                    } catch {
+                        console.warn('Failed to read ai-data attachment');
+                    }
                 }
             }
         }
